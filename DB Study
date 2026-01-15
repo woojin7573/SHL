@@ -1,0 +1,195 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+
+namespace Study
+{
+    class StudyItem
+    {
+        public int Id { get; set; }
+        public string INV_ID { get; set; }
+    }
+
+    class StudyContext : DbContext
+    {
+        private static readonly string DefaultConn = @"Server=(localdb)\MSSQLLocalDB;Database=StudyDb;Trusted_Connection=True;";
+
+        public DbSet<StudyItem> Studies { get; set; }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            var conn = Environment.GetEnvironmentVariable("STUDY_CONN") ?? DefaultConn;
+            optionsBuilder.UseSqlServer(conn);
+        }
+    }
+
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            try
+            {
+                using (var db = new StudyContext())
+                {
+                    db.Database.EnsureCreated();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("DB 연결 또는 생성에 실패했습니다: " + ex.Message);
+                Console.WriteLine("환경변수 `STUDY_CONN` 또는 '(localdb)\\\\MSSQLLocalDB'가 올바른지 확인하세요.");
+                Console.WriteLine("계속하려면 아무 키나 누르세요...");
+                Console.ReadKey();
+                return;
+            }
+
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("운송장 관리 프로그램");
+                Console.WriteLine("1.조회");
+                Console.WriteLine("2.추가");
+                Console.WriteLine("3.수정");
+                Console.WriteLine("4.삭제");
+                Console.WriteLine("5.종료");
+                Console.Write("선택: ");
+                var choice = Console.ReadLine();
+
+                switch (choice)
+                {
+                    case "1": ReadStudy(); break;
+                    case "2": CreateStudy(); break;
+                    case "3": UpdateStudy(); break;
+                    case "4": DeleteStudy(); break;
+                    case "5": return;
+                    default:
+                        Console.WriteLine("잘못된 선택입니다. 계속하려면 아무 키나 누르세요.");
+                        Console.ReadKey();
+                        break;
+                }
+            }
+        }
+
+        static void ReadStudy()
+        {
+            Console.Clear();
+            Console.WriteLine("---운송장 목록---");
+
+            using (var db = new StudyContext())
+            {
+                var list = db.Studies.OrderBy(s => s.Id).ToList();
+                if (list.Count == 0)
+                {
+                    Console.WriteLine("등록된 운송장이 없습니다.");
+                }
+                else
+                {
+                    int idx = 1;
+                    foreach (var s in list)
+                    {
+                        Console.WriteLine($"{idx++}. 운송장 번호: {s.INV_ID}");
+                    }
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("메인으로 돌아가려면 아무 키나 누르세요.");
+            Console.ReadKey();
+        }
+
+        static void CreateStudy()
+        {
+            Console.Clear();
+            Console.Write("추가할 운송장 번호 입력: ");
+            string inv = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(inv))
+            {
+                Console.WriteLine("입력값이 비어있습니다.");
+            }
+            else
+            {
+                using (var db = new StudyContext())
+                {
+                    if (db.Studies.Any(x => x.INV_ID == inv))
+                    {
+                        Console.WriteLine("이미 존재하는 운송장 번호입니다.");
+                    }
+                    else
+                    {
+                        db.Studies.Add(new StudyItem { INV_ID = inv });
+                        db.SaveChanges();
+                        Console.WriteLine("추가 완료");
+                    }
+                }
+            }
+
+            Console.WriteLine("메인으로 돌아가려면 아무 키나 누르세요.");
+            Console.ReadKey();
+        }
+
+        static void UpdateStudy()
+        {
+            Console.Clear();
+            Console.Write("수정할 운송장 번호: ");
+            string oldInv = Console.ReadLine();
+
+            using (var db = new StudyContext())
+            {
+                var s = db.Studies.FirstOrDefault(x => x.INV_ID == oldInv);
+                if (s != null)
+                {
+                    Console.Write("새 운송장 번호: ");
+                    string newInv = Console.ReadLine();
+                    if (string.IsNullOrWhiteSpace(newInv))
+                    {
+                        Console.WriteLine("새 운송장 번호가 비어있습니다.");
+                    }
+                    else if (db.Studies.Any(x => x.INV_ID == newInv && x.Id != s.Id))
+                    {
+                        Console.WriteLine("해당 운송장 번호가 이미 존재합니다.");
+                    }
+                    else
+                    {
+                        s.INV_ID = newInv;
+                        db.SaveChanges();
+                        Console.WriteLine("수정 완료");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("해당 운송장을 찾을 수 없음");
+                }
+            }
+
+            Console.WriteLine("메인으로 돌아가려면 아무 키나 누르세요.");
+            Console.ReadKey();
+        }
+
+        static void DeleteStudy()
+        {
+            Console.Clear();
+            Console.Write("삭제할 운송장 번호: ");
+            string inv = Console.ReadLine();
+
+            using (var db = new StudyContext())
+            {
+                var s = db.Studies.FirstOrDefault(x => x.INV_ID == inv);
+                if (s != null)
+                {
+                    db.Studies.Remove(s);
+                    db.SaveChanges();
+                    Console.WriteLine("삭제 완료");
+                }
+                else
+                {
+                    Console.WriteLine("해당 운송장을 찾을 수 없음");
+                }
+            }
+
+            Console.WriteLine("메인으로 돌아가려면 아무 키나 누르세요.");
+            Console.ReadKey();
+        }
+    }
+}
